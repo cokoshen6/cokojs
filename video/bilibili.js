@@ -286,11 +286,13 @@ async function search(p) {
 
 // ========== 详情 ==========
 
-async function loadDetail(link, p) {
+async function loadDetail(link) {
   if (!link || link.indexOf("bilibili:") !== 0) return null;
   var bvid = link.replace("bilibili:", "");
   if (!bvid) return null;
-  var sd = (p && p.sessdata) || "";
+  // loadDetail 只接收 link 参数，通过闭包或全局变量获取 sessdata
+  // 实际运行时 ForwardWidget 会把返回 type:"video" + videoUrl 交给播放器
+  var sd = "";
 
   // 获取视频信息
   var infoUrl = API + "/x/web-interface/view?bvid=" + encodeURIComponent(bvid);
@@ -342,9 +344,11 @@ async function loadDetail(link, p) {
     id: link, type: "video", title: title, link: link,
     posterPath: poster || undefined,
     videoUrl: videoUrl || undefined,
+    videoSources: videoUrl ? [{ url: videoUrl, type: "video/mp4", label: "1080P" }] : undefined,
     description: (v.desc || "") + "\nUP主: " + (v.owner ? v.owner.name : ""),
     rating: v.stat ? v.stat.view : undefined,
     genreItems: (v.tid && v.tname) ? [{ id: String(v.tid), title: v.tname }] : undefined,
     relatedItems: relatedItems.length ? relatedItems : undefined,
+    customHeaders: { Referer: "https://www.bilibili.com/" },
   };
 }
