@@ -12,7 +12,7 @@ WidgetMetadata = {
   description: 'SubtitleCat 在线字幕加载插件。自动从影片信息提取关键词搜索，也支持手动搜索。返回 .srt 直链供播放器在线显示。',
   author: 'Minis',
   site: 'https://www.subtitlecat.com',
-  version: '1.1.1',
+  version: '1.2.0',
   requiredVersion: '0.0.1',
   modules: [
     {
@@ -61,7 +61,7 @@ function absUrl(url) {
   return SITE + '/' + u;
 }
 
-function stripHtml(s) {
+function strip(s) {
   return String(s || '')
     .replace(/<br\s*\/?>/gi, '\n')
     .replace(/<[^>]+>/g, ' ')
@@ -84,6 +84,15 @@ async function fetchHtml(url, extraHeaders) {
   } catch (e) {
     return '';
   }
+}
+
+function getExt(name) {
+  if (!name) return '';
+  var s = String(name).toLowerCase();
+  if (s.endsWith('.srt')) return '.srt';
+  if (s.endsWith('.ass')) return '.ass';
+  if (s.endsWith('.ssa')) return '.ssa';
+  return '';
 }
 
 function origSrtUrl(pageUrl) {
@@ -133,13 +142,13 @@ function collectKeyword(params) {
     params && params.url,
   ];
   for (var i = 0; i < fields.length; i++) {
-    var v = stripHtml(fields[i]);
+    var v = strip(fields[i]);
     if (v) parts.push(v);
   }
   var raw = parts.join(' ');
   var code = extractAvCode(raw);
   if (code) return code;
-  var title = stripHtml(params && params.title) || stripHtml(params && params.seriesName) || '';
+  var title = strip(params && params.title) || strip(params && params.seriesName) || '';
   return title || raw;
 }
 
@@ -155,10 +164,10 @@ function parseSearchResults(html) {
     var link = absUrl(m[2]);
     if (!link || seen[link]) continue;
     seen[link] = true;
-    var name = stripHtml(m[3]);
-    var size = stripHtml(m[4]) + ' KB';
-    var downloads = stripHtml(m[5]).replace(/\D/g, '');
-    var languages = stripHtml(m[6]).replace(/\D/g, '');
+    var name = strip(m[3]);
+    var size = strip(m[4]) + ' KB';
+    var downloads = strip(m[5]).replace(/\D/g, '');
+    var languages = strip(m[6]).replace(/\D/g, '');
     var tdContent = m[1] || '';
     var langLabel = langFromText(tdContent);
     items.push({
@@ -183,15 +192,11 @@ async function loadSubtitle(params) {
   var html = await fetchHtml(SITE + '/index.php?search=' + encodeURIComponent(keyword));
   var results = parseSearchResults(html);
 
-  // 番号含横线时去横线重试
   if (results.length === 0 && /-/.test(keyword)) {
-    html = await fetchHtml(
-      SITE + '/index.php?search=' + encodeURIComponent(keyword.replace(/-/g, ''))
-    );
+    html = await fetchHtml(SITE + '/index.php?search=' + encodeURIComponent(keyword.replace(/-/g, '')));
     results = parseSearchResults(html);
   }
 
-  // 小写转大写重试
   if (results.length === 0) {
     var upper = keyword.toUpperCase();
     if (upper !== keyword) {
@@ -212,14 +217,13 @@ async function loadSubtitle(params) {
     exist[r.origUrl] = true;
 
     var tag = langTag(r.langLabel);
-    var displayName = r.name.replace(/\.(srt|ass|ssa)$/i, '');
+    var cleanName = r.name.replace(/\.(srt|ass|ssa)$/i, '');
 
     result.push({
       id: 'scat-' + i + '-' + Date.now(),
-      title: tag + displayName + '.srt',
+      title: tag + cleanName + '.srt',
       subTitle: r.size + ' | ' + r.downloads + '次下载',
-      description:
-        r.name + '\n' + r.size + '\n' + r.downloads + '次下载\n' + (r.langLabel ? '源语言：' + r.langLabel : ''),
+      description: '大小: ' + r.size + '\n下载: ' + r.downloads + '次' + (r.langLabel ? '\n源语言: ' + r.langLabel : ''),
       lang: r.langLabel || '未知',
       count: r.downloads + r.languages * 100,
       url: r.origUrl,
@@ -232,17 +236,14 @@ async function loadSubtitle(params) {
 // ========== searchSubs — 手动搜索 ==========
 
 async function searchSubs(params) {
-  var keyword = stripHtml(params && params.keyword);
+  var keyword = strip(params && params.keyword);
   if (!keyword || keyword.length < 1) return [];
 
   var html = await fetchHtml(SITE + '/index.php?search=' + encodeURIComponent(keyword));
   var results = parseSearchResults(html);
 
-  // 含横线去横线重试
   if (results.length === 0 && /-/.test(keyword)) {
-    html = await fetchHtml(
-      SITE + '/index.php?search=' + encodeURIComponent(keyword.replace(/-/g, ''))
-    );
+    html = await fetchHtml(SITE + '/index.php?search=' + encodeURIComponent(keyword.replace(/-/g, '')));
     results = parseSearchResults(html);
   }
 
@@ -271,20 +272,17 @@ async function loadDetail(link) {
   var html = await fetchHtml(link);
   if (!html) return null;
 
-  // 提取字幕名称
   var title = '';
   var tm = html.match(/<h[1-4][^>]*>([\s\S]*?)<\/h[1-4]>/i);
-  if (tm) title = stripHtml(tm[1]);
+  if (tm) title = strip(tm[1]);
 
-  // 提取元信息
   var size = '';
   var downloads = '';
   var sm = html.match(/Size:\s*<\/strong>\s*([\d.]+\s*(?:KB|MB|GB))/i);
-  if (sm) size = stripHtml(sm[1]);
+  if (sm) size = strip(sm[1]);
   var dm = html.match(/Downloads:\s*<\/strong>\s*([\d,]+)/i);
-  if (dm) downloads = stripHtml(dm[1]);
+  if (dm) downloads = strip(dm[1]);
 
-  // 提取源语言
   var langLabel = '';
   var lm = html.match(/\(translated from ([^)]+)\)/i);
   if (lm) langLabel = lm[1];

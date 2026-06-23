@@ -12,7 +12,7 @@ WidgetMetadata = {
   description: 'AVSubtitles 在线字幕加载插件。自动从影片信息提取关键词搜索，也支持手动搜索番号/关键词。',
   author: 'Minis',
   site: 'https://www.avsubtitles.com',
-  version: '1.4.1',
+  version: '1.5.0',
   requiredVersion: '0.0.1',
   modules: [
     {
@@ -61,7 +61,7 @@ function absUrl(url) {
   return SITE + '/' + u;
 }
 
-function stripHtml(s) {
+function strip(s) {
   return String(s || '')
     .replace(/<br\s*\/?>/gi, '\n')
     .replace(/<[^>]+>/g, ' ')
@@ -86,6 +86,15 @@ async function fetchHtml(url, extraHeaders) {
   }
 }
 
+function getExt(name) {
+  if (!name) return '';
+  var s = String(name).toLowerCase();
+  if (s.endsWith('.srt')) return '.srt';
+  if (s.endsWith('.ass')) return '.ass';
+  if (s.endsWith('.ssa')) return '.ssa';
+  return '';
+}
+
 function extractAvCode(text) {
   var m =
     String(text || '').match(/\[([A-Z]{2,10}-?\d{2,8})\]/i) ||
@@ -104,13 +113,13 @@ function collectKeyword(params) {
     params && params.url,
   ];
   for (var i = 0; i < fields.length; i++) {
-    var v = stripHtml(fields[i]);
+    var v = strip(fields[i]);
     if (v) parts.push(v);
   }
   var raw = parts.join(' ');
   var code = extractAvCode(raw);
   if (code) return code;
-  var title = stripHtml(params && params.title) || stripHtml(params && params.seriesName) || '';
+  var title = strip(params && params.title) || strip(params && params.seriesName) || '';
   return title || raw;
 }
 
@@ -124,14 +133,10 @@ function parseSearchResults(html) {
     var link = absUrl(m[3] || m[1]);
     if (!link || seen[link]) continue;
     seen[link] = true;
-    var title = stripHtml(m[4]);
+    var title = strip(m[4]);
     var body = m[5] || '';
-    var actors = stripHtml(
-      (body.match(/With:\s*<span[^>]*>([\s\S]*?)<\/span>/i) || [, ''])[1]
-    );
-    var avail = stripHtml(
-      (body.match(/<span[^>]*>\s*([\d]+)\s+subtitles available/i) || [, ''])[1]
-    );
+    var actors = strip((body.match(/With:\s*<span[^>]*>([\s\S]*?)<\/span>/i) || [, ''])[1]);
+    var avail = strip((body.match(/<span[^>]*>\s*([\d]+)\s+subtitles available/i) || [, ''])[1]);
     items.push({ link: link, title: title, actors: actors, count: avail });
   }
   return items;
@@ -176,33 +181,24 @@ async function loadSubtitle(params) {
   var keyword = collectKeyword(params);
   if (!keyword || keyword.length < 2) return [];
 
-  var html = await fetchHtml(
-    SITE + '/search_results.php?search=' + encodeURIComponent(keyword) + '&language=&page=1'
-  );
+  var html = await fetchHtml(SITE + '/search_results.php?search=' + encodeURIComponent(keyword) + '&language=&page=1');
   var cards = parseSearchResults(html);
 
   if (cards.length === 0 && /-/.test(keyword)) {
-    html = await fetchHtml(
-      SITE +
-        '/search_results.php?search=' +
-        encodeURIComponent(keyword.replace(/-/g, '')) +
-        '&language=&page=1'
-    );
+    html = await fetchHtml(SITE + '/search_results.php?search=' + encodeURIComponent(keyword.replace(/-/g, '')) + '&language=&page=1');
     cards = parseSearchResults(html);
   }
 
   if (cards.length === 0) return [];
 
-  // 进入第一个结果页获取字幕下载链接
   var movieHtml = await fetchHtml(cards[0].link);
   var subs = [];
-  var subRe =
-    /<tr>[\s\S]*?<a\s+class="link_button"\s+href="([^"]+)"[^>]*>[\s\S]*?<\/a>[\s\S]*?<td[^>]*>([\s\S]*?)<\/td>[\s\S]*?<td[^>]*>([\s\S]*?)<\/td>[\s\S]*?<\/tr>/gi;
+  var subRe = /<tr>[\s\S]*?<a\s+class="link_button"\s+href="([^"]+)"[^>]*>[\s\S]*?<\/a>[\s\S]*?<td[^>]*>([\s\S]*?)<\/td>[\s\S]*?<td[^>]*>([\s\S]*?)<\/td>[\s\S]*?<\/tr>/gi;
   var sm;
   while ((sm = subRe.exec(movieHtml))) {
     var infoUrl = absUrl(sm[1]);
-    var subName = stripHtml(sm[2]);
-    var subCount = stripHtml(sm[3]).replace(/\D/g, '');
+    var subName = strip(sm[2]);
+    var subCount = strip(sm[3]).replace(/\D/g, '');
     if (infoUrl) subs.push({ infoUrl: infoUrl, name: subName, count: subCount });
   }
 
@@ -219,35 +215,18 @@ async function loadSubtitle(params) {
 
     var lang = langFromUrl(s.infoUrl);
     var tag = langTag(lang);
-    var displayName = (s.name || '字幕').replace(/\.(srt|ass|ssa)$/i, '');
+    var cleanName = (s.name || '字幕').replace(/\.(srt|ass|ssa)$/i, '');
 
-    // 先访问 download_page 种 session
-    await fetchHtml(
-      SITE +
-        '/download_page.php?subid=' +
-        encodeURIComponent(subid) +
-        '&revid=' +
-        encodeURIComponent(revid)
-    );
+    await fetchHtml(SITE + '/download_page.php?subid=' + encodeURIComponent(subid) + '&revid=' + encodeURIComponent(revid));
 
     result.push({
       id: 'avs-' + subid,
-      title: tag + displayName + '.srt',
+      title: tag + cleanName + '.srt',
       subTitle: lang + ' | ' + (s.count || '0') + '次下载',
-      description:
-        '语言: ' +
-        lang +
-        '\n' +
-        (s.name || '') +
-        '\n来源: AVSubtitles',
+      description: '语言: ' + lang + '\n来源: AVSubtitles',
       lang: lang,
-      count: parseInt(s.count || '0', 10),
-      url:
-        SITE +
-        '/download_sub.php?subid=' +
-        encodeURIComponent(subid) +
-        '&revid=' +
-        encodeURIComponent(revid),
+      count: parseInt(s.count || '0', 10) || 0,
+      url: SITE + '/download_sub.php?subid=' + encodeURIComponent(subid) + '&revid=' + encodeURIComponent(revid),
     });
   }
 
@@ -257,12 +236,10 @@ async function loadSubtitle(params) {
 // ========== searchSubs — 手动搜索 ==========
 
 async function searchSubs(params) {
-  var keyword = stripHtml(params && params.keyword);
+  var keyword = strip(params && params.keyword);
   if (!keyword || keyword.length < 1) return [];
 
-  var html = await fetchHtml(
-    SITE + '/search_results.php?search=' + encodeURIComponent(keyword) + '&language=&page=1'
-  );
+  var html = await fetchHtml(SITE + '/search_results.php?search=' + encodeURIComponent(keyword) + '&language=&page=1');
   var cards = parseSearchResults(html);
 
   var items = [];
@@ -290,27 +267,21 @@ async function loadDetail(link) {
   var html = await fetchHtml(link);
   if (!html) return null;
 
-  // 提取影片标题
   var title = '';
   var tm = html.match(/<h[1-4][^>]*>([\s\S]*?)<\/h[1-4]>/i);
-  if (tm) title = stripHtml(tm[1]);
+  if (tm) title = strip(tm[1]);
 
-  // 提取封面
   var poster = '';
   var pm = html.match(/<div\s+class="cover-image">[\s\S]*?<img\s+src="([^"]+)"/i);
   if (pm) poster = absUrl(pm[1]);
 
-  // 提取演员
   var actors = '';
   var am = html.match(/With:\s*<span[^>]*>([\s\S]*?)<\/span>/i);
-  if (am) actors = stripHtml(am[1]);
+  if (am) actors = strip(am[1]);
 
-  // 提取字幕列表（用于显示）
-  var subRe =
-    /<tr>[\s\S]*?<a\s+class="link_button"\s+href="([^"]+)"[^>]*>[\s\S]*?<\/a>[\s\S]*?<td[^>]*>([\s\S]*?)<\/td>[\s\S]*?<td[^>]*>([\s\S]*?)<\/td>[\s\S]*?<\/tr>/gi;
   var subCount = 0;
-  var sm;
-  while ((sm = subRe.exec(html))) subCount++;
+  var subRe = /<tr>[\s\S]*?<a\s+class="link_button"\s+href="([^"]+)"[^>]*>[\s\S]*?<\/a>[\s\S]*?<td[^>]*>([\s\S]*?)<\/td>[\s\S]*?<td[^>]*>([\s\S]*?)<\/td>[\s\S]*?<\/tr>/gi;
+  while (subRe.exec(html)) subCount++;
 
   return {
     id: link,
@@ -318,11 +289,6 @@ async function loadDetail(link) {
     title: title || '影片详情',
     link: link,
     posterPath: poster,
-    description:
-      '演员: ' +
-      (actors || '未知') +
-      '\n字幕数: ' +
-      subCount +
-      '\n来源: AVSubtitles',
+    description: '演员: ' + (actors || '未知') + '\n字幕数: ' + subCount + '\n来源: AVSubtitles',
   };
 }
