@@ -3,7 +3,7 @@
 WidgetMetadata = {
   id: "forward.pimpbunny",
   title: "PimpBunny",
-  version: "1.0.2",
+  version: "1.0.5",
   requiredVersion: "0.0.1",
   description: "PimpBunny - OnlyFans 视频浏览",
   author: "Minis",
@@ -79,35 +79,51 @@ var UA = "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605
 var HDR = { "User-Agent": UA, Accept: "text/html,application/xhtml+xml", Referer: SITE + "/" };
 
 var normUrl = function(u) { return !u ? "" : /^https?:\/\//i.test(u) ? u : u.indexOf("//") === 0 ? "https:" + u : u.indexOf("/") === 0 ? SITE + u : SITE + "/" + u; };
-var np = function(p) { var n = Number(p); return Number.isFinite(n) && n > 0 ? Math.floor(n) : 1; };
+var normPage = function(p) { var n = Number(p); return Number.isFinite(n) && n > 0 ? Math.floor(n) : 1; };
 var clean = function(t) { return String(t || "").replace(/<[^>]*>/g, " ").replace(/&amp;|&#39;|&quot;|&lt;|&gt;/g, "").replace(/\s+/g, " ").trim(); };
 
-/** 从 HTML 提取所有 \u89c6\u9891\u5361\u7247 */
-function parseVideos(html) {
-  var items = [], seen = {};
-  // \u6bcf\u5f20\u5361\u7247\u4e3a <a class="ui-card-link__..." href="/videos/.../"> ... </a>
-  // \u5305\u542b <img src="..." alt="..."> \u548c\u65f6\u957f
-  var re = /<a[^>]*class="[^"]*ui-card-link__[^"]*"[^>]*href="(https?:\/\/[^"]+\/videos\/[^"]+)"[^>]*>([\s\S]*?)<\/a>/gi;
-  var m;
-  while ((m = re.exec(html))) {
-    var link = normUrl(m[1]), id = link.split("/").filter(Boolean).pop() || link;
-    if (seen[id]) continue;
-    seen[id] = true;
-    var inner = m[2];
-    // data-webp 含真实封面 URL，data:image base64 是缩略图占位
-    var webp = inner.match(/data-webp="([^"]+)"/);
-    var imgMatch = webp && webp[1] && webp[1].startsWith('http') ? webp : inner.match(/<img[^>]+src="([^"]+?)"/);
-    var srcVal = imgMatch ? imgMatch[1] : '';
-    var alt = inner.match(/alt="([^"]+)"/);
-    var dur = inner.match(/(\d{1,2}:\d{2}(?::\d{2})?)\s*[^<]*</);
-    var views = inner.match(/([\d.]+[KM]?)\s*(?:views?|hour|minute|ago)/i);
-    items.push({
-      id: id, type: "link", title: clean(alt ? alt[1] : id),
-      coverUrl: srcVal.replace(/&amp;/g, "&").replace(/^data:image.*/, ""),
-      link: link,
-      rating: views ? function(s){if(!s)return 0;var m=s.match(/^([\d.]+)\s*([KM]?)$/i);if(!m)return 0;var n=parseFloat(m[1]),u=m[2].toUpperCase();return u==="K"?Math.round(n*1000):u==="M"?Math.round(n*1000000):Math.round(n);}(views[1]):undefined,
-      durationText: dur ? clean(dur[1]) : undefined,
-    });
+/** 从一段 HTML 中提取单个视频条目 */
+function parseCard(block) {
+  var a = block.match(/<a[^>]*href="([^"]+)"[^>]*>/);
+  if (!a) return null;
+  var link = normUrl(a[1]);
+  var id = link.split("/").filter(Boolean).pop() || link;
+
+  // 优先 data-webp（真实图片），回退 src（过滤 base64）
+  var webp = block.match(/data-webp="([^"]+)"/);
+  var img = block.match(/<img[^>]+src="([^"]+?)"/);
+  var cover = "";
+  if (webp && webp[1].indexOf("http") === 0) cover = webp[1];
+  else if (img && img[1].indexOf("http") === 0) cover = img[1].replace(/&amp;/g, "&");
+
+  var alt = block.match(/alt="([^"]+)"/);
+  var title = alt ? clean(alt[1]) : id;
+
+  var durMatch = block.match(/(\d{1,2}:\d{2}(?::\d{2})?)\s*</);
+  var durationText = durMatch ? clean(durMatch[1]) : "";
+
+  return {
+    id: id, type: "link", title: title,
+    coverUrl: cover, link: link,
+    durationText: durationText || undefined,
+  };
+}
+
+/** 解析 HTML 中所有视频卡片 */
+function parseCards(html) {
+  var items = [];
+  // 先尝试按 ui-card-video 拆分
+  var parts = html.split(/<div[^>]*class="[^"]*b6m-video[^"]*"[^>]*>/g);
+  for (var i = 1; i < parts.length && items.length < 40; i++) {
+    // 找到闭合 </div>（卡片结束）
+    var depth = 0, end = -1;
+    for (var j = 0; j < parts[i].length; j++) {
+      if (parts[i][j] === '<' && parts[i].substring(j, j+5) === '<div ') { depth++; j += 4; }
+      else if (parts[i][j] === '<' && parts[i].substring(j, j+6) === '</div>') { depth--; j += 5; if (depth < 0) { end = j + 1; break; } }
+    }
+    var block = end > 0 ? parts[i].substring(0, end) : parts[i];
+    var item = parseCard(block);
+    if (item) items.push(item);
   }
   return items;
 }
@@ -115,34 +131,34 @@ function parseVideos(html) {
 async function fetchPage(url) {
   var res = await Widget.http.get(url, { headers: HDR, allow_redirects: true });
   var html = String(res.data || "");
-  if (!html) throw new Error("\u7a7a\u54cd\u5e94");
-  return parseVideos(html);
+  if (!html) throw new Error("空响应");
+  return parseCards(html);
 }
 
 async function loadList(p) {
-  var page = np(p.page || 1);
+  var page = normPage(p.page || 1);
   var items = await fetchPage(page > 1 ? SITE + "/videos/" + page + "/" : SITE + "/videos/");
-  if (!items.length) throw new Error("\u672a\u89e3\u6790\u5230\u89c6\u9891");
+  if (!items.length) throw new Error("未解析到视频");
   return items;
 }
 
 async function loadCategory(p) {
   var slug = String(p.slug || "blowjob").trim();
-  var page = np(p.page || 1);
+  var page = normPage(p.page || 1);
   var qs = "?videos_per_page=32&sort_by=" + encodeURIComponent(p.sort_by || "post_date");
   var base = SITE + "/categories/" + slug + "/";
   var items = await fetchPage(page > 1 ? base + page + "/" + qs : base + qs);
-  if (!items.length) throw new Error("\u672a\u89e3\u6790\u5230\u89c6\u9891");
+  if (!items.length) throw new Error("未解析到视频");
   return items;
 }
 
 async function search(p) {
   var kw = String(p.keyword || "").trim();
-  if (!kw) throw new Error("\u8bf7\u8f93\u5165\u5173\u952e\u8bcd");
-  var page = np(p.page || 1);
+  if (!kw) throw new Error("请输入关键词");
+  var page = normPage(p.page || 1);
   var url = SITE + "/search/?q=" + encodeURIComponent(kw) + "&sort_by=" + encodeURIComponent(p.sort_by || "post_date") + (page > 1 ? "&page=" + page : "");
   var items = await fetchPage(url);
-  if (!items.length) throw new Error("\u6ca1\u6709\u627e\u5230\u7ed3\u679c");
+  if (!items.length) throw new Error("没有找到结果");
   return items;
 }
 
@@ -153,9 +169,14 @@ async function loadDetail(link) {
   var html = String(res.data || "");
   if (!html) return null;
 
-  var title = (html.match(/<h1[^>]*>([^<]+)<\/h1>/) || [])[1];
+  var title = "";
+  var h1 = html.match(/<h1[^>]*>([^<]+)<\/h1>/);
+  if (h1) title = clean(h1[1]);
   if (!title) { var og = html.match(/property=["']og:title["'][^>]*content=["']([^"']+)["']/i); if (og) title = og[1]; }
-  var poster = (html.match(/property=["']og:image["'][^>]*content=["']([^"']+)["']/i) || [])[1];
+
+  var poster = "";
+  var ogImg = html.match(/property=["']og:image["'][^>]*content=["']([^"']+)["']/i);
+  if (ogImg) poster = ogImg[1];
 
   var tags = [];
   var tagRe = /<a[^>]*href="\/tags\/([^"]+)"[^>]*>([^<]+)<\/a>/gi;
@@ -163,14 +184,17 @@ async function loadDetail(link) {
   while ((tm = tagRe.exec(html))) { var n = clean(tm[2]); if (n && n.length < 50) tags.push({ id: tm[1].toLowerCase(), title: n }); }
 
   var videoUrl = "";
-  var srcRe = /get_file[^"']*(?:720p|1080p|480p|360p|240p)[^"']*\.mp4|get_file[^"']*\.mp4/g;
+  var srcRe = /get_file[^"']*(?:720p|1080p|480p|360p|240p)[^"']*\.mp4/g;
   var srcs = html.match(srcRe);
-  if (srcs) { videoUrl = SITE + "/" + srcs[srcs.length - 1].replace(/^\//, ""); }
+  if (srcs && srcs.length > 0) { videoUrl = SITE + "/" + srcs[srcs.length - 1].replace(/^\//, ""); }
+  if (!videoUrl) { srcs = html.match(/get_file[^"']*\.mp4/g); if (srcs && srcs.length > 0) { videoUrl = SITE + "/" + srcs[srcs.length - 1].replace(/^\//, ""); } }
+
+  var relatedItems = parseCards(html).slice(0, 20);
 
   return {
-    id: url, type: "video", title: clean(title || "PimpBunny"), link: url,
+    id: url, type: "video", title: title || "PimpBunny", link: url,
     posterPath: poster || undefined, videoUrl: videoUrl || undefined,
     genreItems: tags.length ? tags.slice(0, 30) : undefined,
-    relatedItems: parseVideos(html).slice(0, 20).length ? undefined : undefined,
+    relatedItems: relatedItems.length ? relatedItems : undefined,
   };
 }
