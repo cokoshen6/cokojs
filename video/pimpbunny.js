@@ -102,17 +102,10 @@ function parseCard(block) {
 
 function parseCards(html) {
   var items = [];
-  var re = /<div[^>]*class="[^"]*ui-card-video__Iv9u1W[^"]*"[^>]*>([\s\S]*?)<\/div>\s*<\/div>\s*<\/div>/gi;
+  // 直接匹配整个卡片 div（包含全部子元素直至卡片闭合）
+  var re = /<div[^>]*class="[^"]*(?:ui-card-video__Iv9u1W|b6m-video)[^"]*"[^>]*>([\s\S]*?)<\/div>\s*<\/div>/gi;
   var m;
   while ((m = re.exec(html))) { var item = parseCard(m[1]); if (item) items.push(item); }
-  if (!items.length) {
-    var parts = html.split(/<div[^>]*class="[^"]*b6m-video[^"]*"[^>]*>/g);
-    for (var i = 1; i < parts.length && items.length < 40; i++) {
-      var end = parts[i].indexOf("</div>");
-      var item = parseCard(end > 0 ? parts[i].substring(0, end) : parts[i]);
-      if (item) items.push(item);
-    }
-  }
   return items;
 }
 
