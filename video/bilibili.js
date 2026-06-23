@@ -3,7 +3,7 @@
 WidgetMetadata = {
   id: "forward.bilibili",
   title: "BiliBili",
-  version: "1.0.0",
+  version: "1.1.0",
   requiredVersion: "0.0.1",
   description: "哔哩哔哩视频搜索与播放",
   author: "Minis",
@@ -13,6 +13,22 @@ WidgetMetadata = {
     { name: "sessdata", title: "SESSDATA (可选)", type: "input", value: "" },
   ],
   modules: [
+    {
+      id: "recommend",
+      title: "首页推荐",
+      functionName: "loadRecommend",
+      type: "video",
+      cacheDuration: 600,
+      params: [{ name: "page", title: "页码", type: "page" }],
+    },
+    {
+      id: "following",
+      title: "关注动态",
+      functionName: "loadFollowing",
+      type: "video",
+      cacheDuration: 600,
+      params: [{ name: "page", title: "页码", type: "page" }],
+    },
     {
       id: "hot",
       title: "热门视频",
@@ -171,6 +187,67 @@ function parseVideoItem(v) {
     })(v.duration) : undefined,
     description: v.author || "",
   };
+}
+
+// ========== 首页推荐 ==========
+
+async function loadRecommend(p) {
+  var page = Number(p.page) || 1;
+  var sd = p.sessdata || "";
+  var params = { fresh_type: 4, page: page, web_location: 1315873 };
+  await wbiSign(params, sd);
+  var url = buildUrl(API + "/x/web-interface/wbi/index/top/feed/rcmd", params);
+  var res = await Widget.http.get(url, { headers: buildHeaders(sd) });
+  var d = res && res.data;
+  if (!d || d.code !== 0) throw new Error("推荐获取失败");
+  var list = d.data && d.data.item || [];
+  return list.map(function(v) {
+    return {
+      id: v.bvid || v.aid, type: "link",
+      title: String(v.title || "").replace(/<[^>]*>/g, ""),
+      coverUrl: v.pic || "",
+      link: "bilibili:" + (v.bvid || v.aid),
+      rating: v.stat && v.stat.view,
+      description: (v.owner && v.owner.name) || "",
+      durationText: v.duration ? (function(s) {
+        var h = Math.floor(s / 60), m = s % 60;
+        return h > 0 ? h + ":" + (m < 10 ? "0" : "") + m : m + ":" + (s < 10 ? "0" : "") + s;
+      })(v.duration) : undefined,
+    };
+  });
+}
+
+// ========== 关注动态 ==========
+
+async function loadFollowing(p) {
+  var page = Number(p.page) || 1;
+  var sd = p.sessdata || "";
+  var params = { type: "video", page: page };
+  var url = buildUrl(API + "/x/polymer/web-dynamic/v1/feed/all", params);
+  var res = await Widget.http.get(url, { headers: buildHeaders(sd) });
+  var d = res && res.data;
+  if (!d || d.code !== 0) throw new Error("关注动态获取失败");
+  var items = d.data && d.data.items || [];
+  var result = [];
+  for (var i = 0; i < items.length; i++) {
+    var item = items[i];
+    var modules = item.modules || {};
+    var mdt = modules.module_dynamic || {};
+    var major = mdt.major || {};
+    var archive = major.archive || {};
+    if (!archive.bvid && !archive.aid) continue;
+    result.push({
+      id: archive.bvid || archive.aid, type: "link",
+      title: String(archive.title || "").replace(/<[^>]*>/g, ""),
+      coverUrl: archive.cover || "",
+      link: "bilibili:" + (archive.bvid || archive.aid),
+      rating: archive.stat && archive.stat.view,
+      durationText: archive.duration_text || undefined,
+      description: modules.module_author ? modules.module_author.name || "" : "",
+    });
+  }
+  if (!result.length) throw new Error("关注动态暂无更新");
+  return result;
 }
 
 // ========== 热门列表 ==========
