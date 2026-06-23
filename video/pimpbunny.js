@@ -58,6 +58,14 @@ WidgetMetadata = {
             { title: "Threesome", value: "threesome" },
           ],
         },
+        { name: "sort_by", title: "排序", type: "enumeration", value: "post_date",
+          enumOptions: [
+            { title: "最新 (Most Recent)", value: "post_date" },
+            { title: "最多观看 (Most Viewed)", value: "video_viewed" },
+            { title: "评分最高 (Best Rated)", value: "rating" },
+            { title: "时长 (Duration)", value: "duration" },
+          ],
+        },
         { name: "page", title: "页码", type: "page" },
       ],
     },
@@ -67,6 +75,13 @@ WidgetMetadata = {
     functionName: "search",
     params: [
       { name: "keyword", title: "关键词", type: "input" },
+      { name: "sort_by", title: "排序", type: "enumeration", value: "post_date",
+        enumOptions: [
+          { title: "最新 (Most Recent)", value: "post_date" },
+          { title: "最多观看 (Most Viewed)", value: "video_viewed" },
+          { title: "评分最高 (Best Rated)", value: "rating" },
+        ],
+      },
       { name: "page", title: "页码", type: "page" },
     ],
   },
@@ -168,7 +183,10 @@ async function loadList(p) {
 async function loadCategory(p) {
   var slug = String(p.slug || "blowjob").trim();
   var page = normPage(p.page || 1);
-  var url = page > 1 ? SITE + "/categories/" + slug + "/" + page + "/" : SITE + "/categories/" + slug + "/";
+  var sort = String(p.sort_by || "post_date").trim();
+  var qs = "?videos_per_page=32&sort_by=" + encodeURIComponent(sort);
+  var base = SITE + "/categories/" + slug + "/";
+  var url = page > 1 ? base + page + "/" + qs : base + qs;
   var res = await Widget.http.get(url, { headers: HDR, allow_redirects: true });
   var html = String(res.data || "");
   if (!html) throw new Error("空响应");
@@ -183,7 +201,8 @@ async function search(p) {
   var kw = String(p.keyword || "").trim();
   if (!kw) throw new Error("请输入关键词");
   var page = normPage(p.page || 1);
-  var url = SITE + "/search/?q=" + encodeURIComponent(kw) + (page > 1 ? "&page=" + page : "");
+  var sort = String(p.sort_by || "post_date").trim();
+  var url = SITE + "/search/?q=" + encodeURIComponent(kw) + "&sort_by=" + encodeURIComponent(sort) + (page > 1 ? "&page=" + page : "");
   var res = await Widget.http.get(url, { headers: HDR, allow_redirects: true });
   var html = String(res.data || "");
   if (!html) throw new Error("空响应");
