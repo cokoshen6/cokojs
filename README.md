@@ -2,23 +2,19 @@
 
 ForwardWidget 字幕插件集合 — 为视频播放器提供在线字幕加载功能。
 
-## 插件列表
+## 目录结构
 
-### 📝 字幕插件
+```
+subtitle/         ← 字幕插件
+  AVSubtitles.js    avsubtitles.com 字幕搜索
+  SubtitleCat.js    subtitlecat.com 字幕搜索
+  guangyazimu.js    光鸭云盘字幕库
 
-| 文件 | 站点 | 版本 | 功能 |
-|------|------|------|------|
-| `AVSubtitles.js` | [avsubtitles.com](https://www.avsubtitles.com) | 1.4.0 | 自动搜索 + 手动搜索字幕，返回 .srt 直链 |
-| `SubtitleCat.js` | [subtitlecat.com](https://www.subtitlecat.com) | 1.1.0 | 自动搜索 + 手动搜索字幕，返回 .srt 直链 |
-| `guangyazimu.js` | [guangyapan.com](https://api.guangyapan.com) | 1.3.0 | 光鸭云盘字幕库，API 指纹匹配 + 番号识别 |
-
-### 🎬 视频浏览插件
-
-| 文件 | 站点 | 功能 |
-|------|------|------|
-| `spankbang.js` | [spankbang.com](https://spankbang.com) | 热门/标签浏览/搜索/详情播放 (HLS+MP4) |
-| `okxxx.js` | [ok.xxx](https://ok.xxx) | 最新/热门/流行/频道/女优/标签/搜索/详情播放 |
-| `bbcrec.js` | [bbcrec.com](https://bbcrec.com) | 热门帖子浏览/详情播放 (HLS) |
+video/            ← 视频浏览插件
+  spankbang.js      spankbang.com 热门/标签/搜索/详情播放
+  okxxx.js          ok.xxx 最新/热门/频道/女优/搜索/详情
+  bbcrec.js         bbcrec.com 热门帖子/HLS 视频播放
+```
 
 ## 通用特性
 
