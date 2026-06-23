@@ -255,10 +255,7 @@ async function loadFollowing(p) {
 async function loadHot(p) {
   var page = Number(p.page) || 1;
   var sd = p.sessdata || "";
-  // 热门用 rid=0（全站）
-  var params = { rid: 0, type: "all", web_location: 1315873 };
-  await wbiSign(params, sd);
-  var url = buildUrl(API + "/x/web-interface/ranking/v2", params);
+  var url = API + "/x/web-interface/ranking/v2?rid=0&type=all";
   var res = await Widget.http.get(url, { headers: buildHeaders(sd) });
   var d = res && res.data;
   if (!d || d.code !== 0) throw new Error("热门获取失败");
