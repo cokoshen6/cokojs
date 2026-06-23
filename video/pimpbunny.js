@@ -3,7 +3,7 @@
 WidgetMetadata = {
   id: "forward.pimpbunny",
   title: "PimpBunny",
-  version: "1.0.6",
+  version: "1.0.7",
   requiredVersion: "0.0.1",
   description: "PimpBunny - OnlyFans 视频浏览",
   author: "Minis",
