@@ -23,7 +23,9 @@ WidgetMetadata = {
         { name: "rid", title: "分区", type: "enumeration", value: "3",
           enumOptions: [
             { title: "全站", value: "0" },
+            { title: "动画", value: "1" },
             { title: "音乐", value: "3" },
+            { title: "游戏", value: "4" },
             { title: "娱乐", value: "5" },
             { title: "影视", value: "181" },
             { title: "纪录片", value: "177" },
@@ -38,6 +40,7 @@ WidgetMetadata = {
             { title: "舞蹈", value: "129" },
             { title: "时尚", value: "155" },
             { title: "电影", value: "23" },
+            { title: "电视剧", value: "11" },
           ],
         },
       ],
