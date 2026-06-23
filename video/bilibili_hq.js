@@ -279,7 +279,13 @@ async function loadDetail(link) {
   var pageIndex = 0;
   if (bvid.indexOf(":") > 0) { var pp = bvid.split(":"); pageIndex = parseInt(pp[1],10)||0; bvid = pp[0]; }
 
-  var infoRes = await Widget.http.get(API + "/x/web-interface/view?bvid=" + encodeURIComponent(bvid), { headers: buildHeaders() });
+  // 尝试从 Widget.storage 读取 sessdata
+  var sd = "";
+  try { var stored = Widget.storage.get("sessdata"); if (stored) sd = stored; } catch(e) {}
+  // 也从 params.sessdata（如果能获取到）
+  try { if (arguments[1] && arguments[1].sessdata) sd = arguments[1].sessdata; } catch(e) {}
+
+  var infoRes = await Widget.http.get(API + "/x/web-interface/view?bvid=" + encodeURIComponent(bvid), { headers: buildHeaders(sd) });
   var infoData = infoRes && infoRes.data;
   if (!infoData || infoData.code !== 0) return null;
   var v = infoData.data;
@@ -304,13 +310,12 @@ async function loadDetail(link) {
     try {
       var hqP = { bvid: bvid, cid: cid, qn: 112, fnval: 0, fnver: 0, fourk: 1, platform: "html5", web_location: 1315873 };
       wbiSign(hqP);
-      var hqR = await Widget.http.get(buildUrl(API + "/x/player/wbi/playurl", hqP), { headers: buildHeaders() });
+      var hqR = await Widget.http.get(buildUrl(API + "/x/player/wbi/playurl", hqP), { headers: buildHeaders(sd) });
       var hqD = hqR && hqR.data;
       if (hqD && hqD.code === 0 && hqD.data && hqD.data.durl) videoUrl = hqD.data.durl[0].url;
     } catch(e) {}
-    // fallback 到老 API
     try {
-      var fbR = await Widget.http.get(API + "/x/player/playurl?avid=" + aid + "&cid=" + cid + "&qn=80&platform=html5&otype=json", { headers: buildHeaders() });
+      var fbR = await Widget.http.get(API + "/x/player/playurl?avid=" + aid + "&cid=" + cid + "&qn=80&platform=html5&otype=json", { headers: buildHeaders(sd) });
       var fbD = fbR && fbR.data;
       if (fbD && fbD.code === 0 && fbD.data && fbD.data.durl) videoUrl = videoUrl || fbD.data.durl[0].url;
     } catch(e) {}
