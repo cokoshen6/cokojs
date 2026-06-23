@@ -94,13 +94,15 @@ function parseVideos(html) {
     if (seen[id]) continue;
     seen[id] = true;
     var inner = m[2];
-    var img = inner.match(/<img[^>]+src="([^"]+?)"/);
+    // data-webp 含真实封面 URL，data:image base64 是缩略图占位
+    var webp = inner.match(/data-webp="([^"]+)"/);
+    var img = webp ? webp : inner.match(/<img[^>]+src="([^"]+?)"/);
     var alt = inner.match(/alt="([^"]+)"/);
     var dur = inner.match(/(\d{1,2}:\d{2}(?::\d{2})?)\s*[^<]*</);
     var views = inner.match(/([\d.]+[KM]?)\s*(?:views?|hour|minute|ago)/i);
     items.push({
       id: id, type: "link", title: clean(alt ? alt[1] : id),
-      coverUrl: img ? img[1].replace(/&amp;/g, "&") : "",
+      coverUrl: img ? img[1].replace(/&amp;/g, "&").replace(/^data:image.*/, "") : "",
       link: link,
       rating: views ? function(s){if(!s)return 0;var m=s.match(/^([\d.]+)\s*([KM]?)$/i);if(!m)return 0;var n=parseFloat(m[1]),u=m[2].toUpperCase();return u==="K"?Math.round(n*1000):u==="M"?Math.round(n*1000000):Math.round(n);}(views[1]):undefined,
       durationText: dur ? clean(dur[1]) : undefined,
