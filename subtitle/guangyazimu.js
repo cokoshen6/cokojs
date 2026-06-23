@@ -268,12 +268,13 @@ async function loadSubtitle(params) {
     result.push({
       id: entry.item.id,
       title: entry.item.name,
-      subTitle:
-        langTag(entry.item.langs) +
-        ' ' +
-        mtLabel +
-        (entry.item.star === '5' ? ' ★★★★★' : '') +
-        (entry.item.mt === 1 ? ' [高可信]' : ''),
+      subTitle: [
+        langTag(entry.item.langs),
+        entry.item.duration > 0
+          ? Math.floor(entry.item.duration / 60) + ':' + (entry.item.duration % 60 < 10 ? '0' : '') + (entry.item.duration % 60)
+          : '',
+        mtLabel + (entry.item.mt === 1 ? ' ✓' : ''),
+      ].filter(Boolean).join(' '),
       description: [
         entry.item.duration > 0
           ? '时长 ' + Math.floor(entry.item.duration / 60) + ':' + (entry.item.duration % 60 < 10 ? '0' : '') + (entry.item.duration % 60)
@@ -283,6 +284,7 @@ async function loadSubtitle(params) {
         .filter(Boolean)
         .join(' | '),
       lang: entry.item.langs || 'zh',
+      duration: entry.item.duration || undefined,
       count: entry.score,
       url: entry.item.url,
     });
