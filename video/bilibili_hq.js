@@ -319,14 +319,14 @@ async function loadDetail(link) {
   var videoUrl = "";
   if (cid && aid) {
     try {
-      var hqP = { bvid: bvid, cid: cid, qn: preferQn, fnval: 0, fnver: 0, fourk: 1, platform: "html5", web_location: 1315873 };
+      var hqP = { bvid: bvid, cid: cid, qn: preferQn, fnval: 4048, fnver: 0, fourk: 1, platform: "ios", high_quality: "1", video_codecid: "12", web_location: 1315873 };
       wbiSign(hqP);
       var hqR = await Widget.http.get(buildUrl(API + "/x/player/wbi/playurl", hqP), { headers: buildHeaders(sd) });
       var hqD = hqR && hqR.data;
       if (hqD && hqD.code === 0 && hqD.data && hqD.data.durl) videoUrl = hqD.data.durl[0].url;
     } catch(e) {}
     try {
-      var fbR = await Widget.http.get(API + "/x/player/playurl?avid=" + aid + "&cid=" + cid + "&qn=80&platform=html5&otype=json", { headers: buildHeaders(sd) });
+      var fbR = await Widget.http.get(API + "/x/player/playurl?avid=" + aid + "&cid=" + cid + "&qn=80&platform=ios&otype=json&fourk=1", { headers: buildHeaders(sd) });
       var fbD = fbR && fbR.data;
       if (fbD && fbD.code === 0 && fbD.data && fbD.data.durl) videoUrl = videoUrl || fbD.data.durl[0].url;
     } catch(e) {}

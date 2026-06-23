@@ -346,7 +346,7 @@ async function loadDetail(link) {
   var videoUrl = "";
   if (cid && aid) {
     try {
-      var fbR = await Widget.http.get(API + "/x/player/playurl?avid=" + aid + "&cid=" + cid + "&qn=80&platform=html5&otype=json", { headers: buildHeaders() });
+      var fbR = await Widget.http.get(API + "/x/player/playurl?avid=" + aid + "&cid=" + cid + "&qn=80&platform=ios&otype=json&fourk=1", { headers: buildHeaders() });
       var fbD = fbR && fbR.data;
       if (fbD && fbD.code === 0 && fbD.data && fbD.data.durl) videoUrl = fbD.data.durl[0].url;
     } catch(e) {}
