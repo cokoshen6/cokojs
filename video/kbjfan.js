@@ -5,7 +5,7 @@ WidgetMetadata = {
   title: "KBJFan",
   author: "Minis",
   description: "KBJFan - 韩国 BJ 视频",
-  version: "2.0.3",
+  version: "2.0.4",
   requiredVersion: "0.0.1",
   site: "https://www.kbjfan.com",
   modules: [
@@ -14,6 +14,7 @@ WidgetMetadata = {
       title: "Latest Korean BJ",
       functionName: "loadLatest",
       type: "video",
+      requiresWebView: true,
       params: [
         { name: "page", title: "页码", type: "page" },
         { name: "orderby", title: "排序", type: "enumeration", value: "", enumOptions: [
@@ -29,6 +30,7 @@ WidgetMetadata = {
       title: "Korean BJ Dance",
       functionName: "loadDance",
       type: "video",
+      requiresWebView: true,
       params: [
         { name: "page", title: "页码", type: "page" },
         { name: "orderby", title: "排序", type: "enumeration", value: "", enumOptions: [
@@ -44,6 +46,7 @@ WidgetMetadata = {
       title: "Korean BJ Nude",
       functionName: "loadNude",
       type: "video",
+      requiresWebView: true,
       params: [
         { name: "page", title: "页码", type: "page" },
         { name: "orderby", title: "排序", type: "enumeration", value: "", enumOptions: [
@@ -148,16 +151,18 @@ async function loadDetail(link) {
     if (t && (t.indexOf(":") !== -1 || t.indexOf("：") !== -1)) infoLines.push(t);
   }
 
-  // 从 DPlayer 提取视频源（VIP 隐藏区域中嵌入的 video > source）
+  // 从 DPlayer 提取视频源（直接匹配 <source src= 无需登录）
   var videoUrl = "";
-  var videoM = html.match(/<source\s+src="([^"]+\.mp4[^"]*)"/i);
-  if (videoM) videoUrl = videoM[1];
+  // source src 可能在 #posts-pay 里，无论登录与否都在 HTML 中（nosrc 不影响 source 子元素）
+  var srcRe = /<source[^>]+src="([^"]+\.mp4[^"]*)"/i;
+  var srcM = html.match(srcRe);
+  if (srcM) videoUrl = srcM[1];
 
-  // 尝试提取其他可能的视频源
+  // 回退：从 script 配置中提取
   if (!videoUrl) {
-    var altM = html.match(/data-video=["']([^"']+)["']/i) ||
-               html.match(/video_url["']:\s*["']([^"']+)["']/i);
-    if (altM) videoUrl = altM[1];
+    var jsonRe = /"url"\s*:\s*"([^"]+\.mp4[^"]*)"/i;
+    var jsonM = html.match(jsonRe);
+    if (jsonM) videoUrl = jsonM[1];
   }
 
   return {
@@ -170,10 +175,7 @@ async function loadDetail(link) {
     posterPath: thumb,
     description: infoLines.join("\n"),
     videoUrl: videoUrl || undefined,
+    videoSources: videoUrl ? [{ url: videoUrl, type: "video/mp4", label: "MP4" }] : undefined,
     playerType: "app",
-    customHeaders: {
-      "User-Agent": UA,
-      Referer: url,
-    },
   };
 }
