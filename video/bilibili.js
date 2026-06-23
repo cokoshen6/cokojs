@@ -322,7 +322,7 @@ async function loadDetail(link) {
     }
   }
 
-  // 获取播放 URL（使用无需 WBI 签名的老版 API）
+  // 获取播放 URL（使用无需 WBI 签名的老版 API，最高 1080P）
   var videoUrl = "";
   if (cid && v.aid) {
     try {
