@@ -127,13 +127,19 @@ async function loadDetail(link) {
   var html = await fetchHtml(url);
   if (!html) return fallback;
 
+  // 提取标题
+  var title = "";
   var titleM = html.match(/<h1[^>]*class="article-title"[^>]*>[\s\S]*?<a[^>]*>([\s\S]*?)<\/a>/i);
-  var title = titleM ? strip(titleM[1]) : (url.split("/").pop() || "");
+  if (titleM) title = strip(titleM[1]);
+  if (!title) title = url.split("/").pop() || "";
 
+  // 提取封面
+  var thumb = "";
   var thumbM = html.match(/<img[^>]+src="([^"]+Previews[^"]+)"[^>]*class="[^"]*fit-cover[^"]*"/i) ||
                html.match(/<img[^>]+class="[^"]*fit-cover[^"]*"[^>]+src="([^"]+Previews[^"]+)"/i);
-  var thumb = thumbM ? thumbM[1].replace(/&amp;/g, "&") : "";
+  if (thumbM) thumb = thumbM[1].replace(/&amp;/g, "&");
 
+  // 提取信息行
   var infoLines = [];
   var infoRe = /<p>([^<]+)<\/p>/gi;
   var im;
@@ -142,9 +148,32 @@ async function loadDetail(link) {
     if (t && (t.indexOf(":") !== -1 || t.indexOf("：") !== -1)) infoLines.push(t);
   }
 
+  // 从 DPlayer 提取视频源（VIP 隐藏区域中嵌入的 video > source）
+  var videoUrl = "";
+  var videoM = html.match(/<source\s+src="([^"]+\.mp4[^"]*)"/i);
+  if (videoM) videoUrl = videoM[1];
+
+  // 尝试提取其他可能的视频源
+  if (!videoUrl) {
+    var altM = html.match(/data-video=["']([^"']+)["']/i) ||
+               html.match(/video_url["']:\s*["']([^"']+)["']/i);
+    if (altM) videoUrl = altM[1];
+  }
+
   return {
-    id: url, type: "url", title: title, link: url,
-    coverUrl: thumb, backdropPath: thumb, posterPath: thumb,
+    id: url,
+    type: "video",
+    title: title,
+    link: url,
+    coverUrl: thumb,
+    backdropPath: thumb,
+    posterPath: thumb,
     description: infoLines.join("\n"),
+    videoUrl: videoUrl || undefined,
+    playerType: "app",
+    customHeaders: {
+      "User-Agent": UA,
+      Referer: url,
+    },
   };
 }
