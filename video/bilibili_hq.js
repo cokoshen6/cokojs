@@ -275,6 +275,9 @@ async function loadDetail(link) {
   if (!link || link.indexOf("bilibili:") !== 0) return null;
   var bvid = link.replace("bilibili:", "");
   if (!bvid) return null;
+  // 解析分 P 索引
+  var pageIndex = 0;
+  if (bvid.indexOf(":") > 0) { var pp = bvid.split(":"); pageIndex = parseInt(pp[1],10)||0; bvid = pp[0]; }
 
   var infoRes = await Widget.http.get(API + "/x/web-interface/view?bvid=" + encodeURIComponent(bvid), { headers: buildHeaders() });
   var infoData = infoRes && infoRes.data;
@@ -286,65 +289,31 @@ async function loadDetail(link) {
   var poster = v.pic || "";
   var aid = v.aid;
   var pages = v.pages || [];
-
-  // 解析分 P 索引（link 格式：bilibili:BVxxx 或 bilibili:BVxxx:2）
-  var pageIndex = 0;
-  var parts = link.split(":");
-  if (parts.length >= 3) pageIndex = parseInt(parts[2], 10) || 0;
   if (pageIndex < 0 || pageIndex >= pages.length) pageIndex = 0;
-
   var cid = pages[pageIndex] && pages[pageIndex].cid;
 
-  // 构建分 P 列表
+  // 分 P 列表
   var episodeItems = [];
   for (var ei = 0; ei < pages.length; ei++) {
-    episodeItems.push({
-      id: "ep:" + pages[ei].cid,
-      title: (ei + 1) + ": " + (pages[ei].part || "P" + (ei+1)),
-      link: "bilibili:" + bvid + ":" + ei,
-    });
+    episodeItems.push({ id: "ep:" + pages[ei].cid, title: (ei+1) + ": " + (pages[ei].part || "P"+(ei+1)), link: "bilibili:" + bvid + ":" + ei });
   }
 
-  // 相关推荐
-  var relatedItems = [];
-  if (v.bvid) {
-    var relRes = await Widget.http.get(API + "/x/web-interface/archive/related?bvid=" + encodeURIComponent(v.bvid), { headers: buildHeaders() });
-    var relData = relRes && relRes.data;
-    if (relData && relData.data) {
-      relatedItems = (relData.data || []).map(function(item) {
-        return { id: item.bvid, type: "link", title: String(item.title || "").replace(/<[^>]*>/g, ""), coverUrl: item.pic || "", link: "bilibili:" + item.bvid, durationText: item.duration ? (function(s){var h=Math.floor(s/60),m=s%60;return h>0?h+":"+(m<10?"0":"")+m:"0:"+(s<10?"0":"")+s;})(item.duration) : undefined };
-      });
-    }
-  }
-
-  // 高画质播放 URL（WBI 签名）
+  // 稳定获取播放 URL（WBI 高画质 → 老 API fallback）
   var videoUrl = "";
   if (cid && aid) {
     try {
-      var playParams = { bvid: bvid, cid: cid, qn: 112, fnval: 0, fnver: 0, fourk: 1, platform: "html5", web_location: 1315873 };
-      wbiSign(playParams);
-      var playRes = await Widget.http.get(buildUrl(API + "/x/player/wbi/playurl", playParams), { headers: buildHeaders() });
-      var playData = playRes && playRes.data;
-      if (playData && playData.code === 0 && playData.data && playData.data.durl) {
-        videoUrl = playData.data.durl[0].url;
-      }
-      if (!videoUrl) {
-        // fallback 到老版 API
-        var fbRes = await Widget.http.get(API + "/x/player/playurl?avid=" + aid + "&cid=" + cid + "&qn=80&platform=html5&otype=json", { headers: buildHeaders() });
-        var fbData = fbRes && fbRes.data;
-        if (fbData && fbData.code === 0 && fbData.data && fbData.data.durl) {
-          videoUrl = fbData.data.durl[0].url;
-        }
-      }
-    } catch(e) {
-      try {
-        var fbRes = await Widget.http.get(API + "/x/player/playurl?avid=" + aid + "&cid=" + cid + "&qn=80&platform=html5&otype=json", { headers: buildHeaders() });
-        var fbData = fbRes && fbRes.data;
-        if (fbData && fbData.code === 0 && fbData.data && fbData.data.durl) {
-          videoUrl = fbData.data.durl[0].url;
-        }
-      } catch(e2) {}
-    }
+      var hqP = { bvid: bvid, cid: cid, qn: 112, fnval: 0, fnver: 0, fourk: 1, platform: "html5", web_location: 1315873 };
+      wbiSign(hqP);
+      var hqR = await Widget.http.get(buildUrl(API + "/x/player/wbi/playurl", hqP), { headers: buildHeaders() });
+      var hqD = hqR && hqR.data;
+      if (hqD && hqD.code === 0 && hqD.data && hqD.data.durl) videoUrl = hqD.data.durl[0].url;
+    } catch(e) {}
+    // fallback 到老 API
+    try {
+      var fbR = await Widget.http.get(API + "/x/player/playurl?avid=" + aid + "&cid=" + cid + "&qn=80&platform=html5&otype=json", { headers: buildHeaders() });
+      var fbD = fbR && fbR.data;
+      if (fbD && fbD.code === 0 && fbD.data && fbD.data.durl) videoUrl = videoUrl || fbD.data.durl[0].url;
+    } catch(e) {}
   }
 
   return {
@@ -356,7 +325,7 @@ async function loadDetail(link) {
     rating: v.stat ? v.stat.view : undefined,
     genreItems: (v.tid && v.tname) ? [{ id: String(v.tid), title: v.tname }] : undefined,
     episodeItems: episodeItems.length > 1 ? episodeItems : undefined,
-    relatedItems: relatedItems.length ? relatedItems : undefined,
+    relatedItems: undefined,
     customHeaders: { Referer: "https://www.bilibili.com/" },
   };
 }

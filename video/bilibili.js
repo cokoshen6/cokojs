@@ -322,13 +322,10 @@ async function loadDetail(link) {
   if (!link || link.indexOf("bilibili:") !== 0) return null;
   var bvid = link.replace("bilibili:", "");
   if (!bvid) return null;
-  // loadDetail 只接收 link 参数，通过闭包或全局变量获取 sessdata
-  // 实际运行时 ForwardWidget 会把返回 type:"video" + videoUrl 交给播放器
-  var sd = "";
+  var pageIndex = 0;
+  if (bvid.indexOf(":") > 0) { var pp = bvid.split(":"); pageIndex = parseInt(pp[1],10)||0; bvid = pp[0]; }
 
-  // 获取视频信息
-  var infoUrl = API + "/x/web-interface/view?bvid=" + encodeURIComponent(bvid);
-  var infoRes = await Widget.http.get(infoUrl, { headers: buildHeaders(sd) });
+  var infoRes = await Widget.http.get(API + "/x/web-interface/view?bvid=" + encodeURIComponent(bvid), { headers: buildHeaders() });
   var infoData = infoRes && infoRes.data;
   if (!infoData || infoData.code !== 0) return null;
   var v = infoData.data;
@@ -338,55 +335,21 @@ async function loadDetail(link) {
   var poster = v.pic || "";
   var aid = v.aid;
   var pages = v.pages || [];
-
-  // 解析分 P 索引（link 格式：bilibili:BVxxx 或 bilibili:BVxxx:2）
-  var pageIndex = 0;
-  var parts2 = link.split(":");
-  if (parts2.length >= 3) pageIndex = parseInt(parts2[2], 10) || 0;
   if (pageIndex < 0 || pageIndex >= pages.length) pageIndex = 0;
-
   var cid = pages[pageIndex] && pages[pageIndex].cid;
 
-  // 构建分 P 列表
   var episodeItems = [];
   for (var ei = 0; ei < pages.length; ei++) {
-    episodeItems.push({
-      id: "ep:" + pages[ei].cid,
-      title: (ei + 1) + ": " + (pages[ei].part || "P" + (ei+1)),
-      link: "bilibili:" + bvid + ":" + ei,
-    });
+    episodeItems.push({ id: "ep:" + pages[ei].cid, title: (ei+1) + ": " + (pages[ei].part || "P"+(ei+1)), link: "bilibili:" + bvid + ":" + ei });
   }
 
-  // 相关推荐
-  var relatedItems = [];
-  if (v.bvid) {
-    var relRes = await Widget.http.get(API + "/x/web-interface/archive/related?bvid=" + encodeURIComponent(v.bvid), { headers: buildHeaders(sd) });
-    var relData = relRes && relRes.data;
-    if (relData && relData.data) {
-      relatedItems = (relData.data || []).map(function(item) {
-        return {
-          id: item.bvid, type: "link", title: String(item.title || "").replace(/<[^>]*>/g, ""),
-          coverUrl: item.pic || "", link: "bilibili:" + item.bvid,
-          durationText: item.duration ? (function(s){var h=Math.floor(s/3600),m=Math.floor((s%3600)/60),sec=s%60;return h>0?h+":"+(m<10?"0":"")+m+":"+(sec<10?"0":""):m+":"+(sec<10?"0":"")+(sec||"00");})(item.duration) : undefined,
-        };
-      });
-    }
-  }
-
-  // 获取播放 URL（使用无需 WBI 签名的老版 API，最高 1080P）
   var videoUrl = "";
-  if (cid && v.aid) {
+  if (cid && aid) {
     try {
-      var playUrl = API + "/x/player/playurl?avid=" + v.aid + "&cid=" + cid + "&qn=80&platform=html5&otype=json";
-      var playRes = await Widget.http.get(playUrl, { headers: buildHeaders(sd) });
-      var playData = playRes && playRes.data;
-      if (playData && playData.code === 0 && playData.data) {
-        var durl = playData.data.durl;
-        if (durl && durl[0]) videoUrl = durl[0].url;
-      }
-    } catch (e) {
-      // 播放地址获取失败不影响详情展示
-    }
+      var fbR = await Widget.http.get(API + "/x/player/playurl?avid=" + aid + "&cid=" + cid + "&qn=80&platform=html5&otype=json", { headers: buildHeaders() });
+      var fbD = fbR && fbR.data;
+      if (fbD && fbD.code === 0 && fbD.data && fbD.data.durl) videoUrl = fbD.data.durl[0].url;
+    } catch(e) {}
   }
 
   return {
@@ -398,7 +361,7 @@ async function loadDetail(link) {
     rating: v.stat ? v.stat.view : undefined,
     genreItems: (v.tid && v.tname) ? [{ id: String(v.tid), title: v.tname }] : undefined,
     episodeItems: episodeItems.length > 1 ? episodeItems : undefined,
-    relatedItems: relatedItems.length ? relatedItems : undefined,
+    relatedItems: undefined,
     customHeaders: { Referer: "https://www.bilibili.com/" },
   };
 }
