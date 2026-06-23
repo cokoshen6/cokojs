@@ -87,10 +87,10 @@ function parseCard(block) {
   var a = block.match(/<a[^>]*href="([^"]+)"[^>]*>/);
   if (!a) return null;
   var link = normUrl(a[1]), id = link.split("/").filter(Boolean).pop() || link;
-  var img = block.match(/<img[^>]*src="([^"]+)"[^>]*>/);
+  var img = block.match(/<img[^>]+src="([^"]+?)"/);
   var title = (block.match(/alt="([^"]+)"/) || [])[1];
-  var dur = (block.match(/<div[^>]*class="[^"]*duration[^"]*"[^>]*>\s*([^<]+)</i) || [])[1];
-  var views = (block.match(/([\d.]+[KM]?)\s*(?:views|hour|minute|ago)/i) || [])[1];
+  var dur = (block.match(/(\d{1,2}:\d{2}(?::\d{2})?)\s*</) || [])[1];
+  var views = (block.match(/([\d.]+[KM]?)\s*(?:views?|hour|minute|ago)/i) || [])[1];
   return {
     id: id, type: "link", title: clean(title || id),
     coverUrl: img ? img[1].replace(/&amp;/g, "&") : "",
