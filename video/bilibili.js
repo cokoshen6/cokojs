@@ -51,7 +51,12 @@ WidgetMetadata = {
 
 var API = "https://api.bilibili.com";
 var UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36";
-var HDR = { "User-Agent": UA, Referer: "https://www.bilibili.com/" };
+
+function buildHeaders(sessdata) {
+  var h = { "User-Agent": UA, Referer: "https://www.bilibili.com/" };
+  if (sessdata) h.Cookie = "SESSDATA=" + encodeURIComponent(sessdata);
+  return h;
+}
 
 // ========== 纯 JS MD5 实现 ==========
 var md5 = (function() {
@@ -115,10 +120,10 @@ var md5 = (function() {
 // ========== WBI 签名 ==========
 var wbiKey = { mixin: "", expires: 0 };
 
-async function getWbiKey() {
+async function getWbiKey(sessdata) {
   if (wbiKey.expires > Date.now()) return wbiKey.mixin;
   try {
-    var res = await Widget.http.get(API + "/x/web-interface/nav", { headers: HDR });
+    var res = await Widget.http.get(API + "/x/web-interface/nav", { headers: buildHeaders(sessdata) });
     var d = res && res.data;
     if (!d || d.code !== 0) throw new Error("nav err");
     var wbi = d.data && d.data.wbi_img;
@@ -133,8 +138,8 @@ async function getWbiKey() {
   }
 }
 
-async function wbiSign(params) {
-  var mixin = await getWbiKey();
+async function wbiSign(params, sessdata) {
+  var mixin = await getWbiKey(sessdata);
   params.wts = Math.floor(Date.now() / 1000);
   var keys = Object.keys(params).sort();
   var q = [];
@@ -172,11 +177,12 @@ function parseVideoItem(v) {
 
 async function loadHot(p) {
   var page = Number(p.page) || 1;
+  var sd = p.sessdata || "";
   // 热门用 rid=0（全站）
   var params = { rid: 0, type: "all", web_location: 1315873 };
-  await wbiSign(params);
+  await wbiSign(params, sd);
   var url = buildUrl(API + "/x/web-interface/ranking/v2", params);
-  var res = await Widget.http.get(url, { headers: HDR });
+  var res = await Widget.http.get(url, { headers: buildHeaders(sd) });
   var d = res && res.data;
   if (!d || d.code !== 0) throw new Error("热门获取失败");
   var list = d.data && d.data.list || [];
@@ -189,13 +195,14 @@ async function search(p) {
   var kw = String(p.keyword || "").trim();
   if (!kw) throw new Error("请输入关键词");
   var page = Number(p.page) || 1;
+  var sd = p.sessdata || "";
   var params = {
     keyword: kw, search_type: "video", page: page,
     order: p.order || "totalrank", duration: p.duration || "0",
   };
-  await wbiSign(params);
+  await wbiSign(params, sd);
   var url = buildUrl(API + "/x/web-interface/search/type", params);
-  var res = await Widget.http.get(url, { headers: HDR });
+  var res = await Widget.http.get(url, { headers: buildHeaders(sd) });
   var d = res && res.data;
   if (!d || d.code !== 0) throw new Error("搜索失败");
   var result = d.data && d.data.result || [];
@@ -205,14 +212,15 @@ async function search(p) {
 
 // ========== 详情 ==========
 
-async function loadDetail(link) {
+async function loadDetail(link, p) {
   if (!link || link.indexOf("bilibili:") !== 0) return null;
   var bvid = link.replace("bilibili:", "");
   if (!bvid) return null;
+  var sd = (p && p.sessdata) || "";
 
   // 获取视频信息
   var infoUrl = API + "/x/web-interface/view?bvid=" + encodeURIComponent(bvid);
-  var infoRes = await Widget.http.get(infoUrl, { headers: HDR });
+  var infoRes = await Widget.http.get(infoUrl, { headers: buildHeaders(sd) });
   var infoData = infoRes && infoRes.data;
   if (!infoData || infoData.code !== 0) return null;
   var v = infoData.data;
@@ -225,7 +233,7 @@ async function loadDetail(link) {
   // 相关推荐
   var relatedItems = [];
   if (v.bvid) {
-    var relRes = await Widget.http.get(API + "/x/web-interface/archive/related?bvid=" + encodeURIComponent(v.bvid), { headers: HDR });
+    var relRes = await Widget.http.get(API + "/x/web-interface/archive/related?bvid=" + encodeURIComponent(v.bvid), { headers: buildHeaders(sd) });
     var relData = relRes && relRes.data;
     if (relData && relData.data) {
       relatedItems = (relData.data || []).map(function(item) {
@@ -243,9 +251,9 @@ async function loadDetail(link) {
   if (cid) {
     try {
       var playParams = { bvid: bvid, cid: cid, qn: 80, fnval: 0, fnver: 0, fourk: 1, platform: "html5", web_location: 1315873 };
-      await wbiSign(playParams);
+      await wbiSign(playParams, sd);
       var playUrl = buildUrl(API + "/x/player/wbi/playurl", playParams);
-      var playRes = await Widget.http.get(playUrl, { headers: HDR });
+      var playRes = await Widget.http.get(playUrl, { headers: buildHeaders(sd) });
       var playData = playRes && playRes.data;
       if (playData && playData.code === 0 && playData.data) {
         var durl = playData.data.durl;
