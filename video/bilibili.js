@@ -335,8 +335,27 @@ async function loadDetail(link) {
   if (!v) return null;
 
   var title = v.title || bvid;
-  var cid = v.pages && v.pages[0] && v.pages[0].cid;
   var poster = v.pic || "";
+  var aid = v.aid;
+  var pages = v.pages || [];
+
+  // 解析分 P 索引（link 格式：bilibili:BVxxx 或 bilibili:BVxxx:2）
+  var pageIndex = 0;
+  var parts2 = link.split(":");
+  if (parts2.length >= 3) pageIndex = parseInt(parts2[2], 10) || 0;
+  if (pageIndex < 0 || pageIndex >= pages.length) pageIndex = 0;
+
+  var cid = pages[pageIndex] && pages[pageIndex].cid;
+
+  // 构建分 P 列表
+  var episodeItems = [];
+  for (var ei = 0; ei < pages.length; ei++) {
+    episodeItems.push({
+      id: "ep:" + pages[ei].cid,
+      title: (ei + 1) + ": " + (pages[ei].part || "P" + (ei+1)),
+      link: "bilibili:" + bvid + ":" + ei,
+    });
+  }
 
   // 相关推荐
   var relatedItems = [];
@@ -378,6 +397,7 @@ async function loadDetail(link) {
     description: (v.desc || "") + "\nUP主: " + (v.owner ? v.owner.name : ""),
     rating: v.stat ? v.stat.view : undefined,
     genreItems: (v.tid && v.tname) ? [{ id: String(v.tid), title: v.tname }] : undefined,
+    episodeItems: episodeItems.length > 1 ? episodeItems : undefined,
     relatedItems: relatedItems.length ? relatedItems : undefined,
     customHeaders: { Referer: "https://www.bilibili.com/" },
   };
