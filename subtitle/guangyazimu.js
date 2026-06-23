@@ -9,7 +9,7 @@
 WidgetMetadata = {
   id: 'guangyasub',
   title: '光鸭字幕',
-  version: '1.3.1',
+  version: '1.4.0',
   requiredVersion: '0.0.1',
   description: '光鸭云盘字幕库。自动从影片信息提取番号/关键词搜索匹配字幕，支持指纹匹配、文件名匹配，智能排序。',
   author: 'Minis',
@@ -35,11 +35,59 @@ function getText(value) {
 function langTag(langStr) {
   if (!langStr) return '【其他】';
   var t = String(langStr).toLowerCase();
+  if (t.includes('双语') || t.includes('中英')) return '【双语】';
   if (t.includes('简') || t.includes('chs') || t.includes('zho') || t.includes('chi')) return '【简中】';
   if (t.includes('繁') || t.includes('cht')) return '【繁中】';
-  if (t.includes('双语') || t.includes('中英')) return '【双语】';
   if (t.includes('英') || t.includes('eng')) return '【英文】';
   return '【字幕】';
+}
+
+// 从多个值中取第一个有效数字
+function firstNumber() {
+  for (var i = 0; i < arguments.length; i++) {
+    var n = Number(arguments[i]);
+    if (Number.isFinite(n) && n > 0) return n;
+  }
+  return 0;
+}
+
+// 解析多种时长格式 → 秒数
+function parseDuration(value) {
+  if (value == null) return 0;
+  if (typeof value === 'number' && Number.isFinite(value)) return value;
+  var text = getText(value);
+  if (!text) return 0;
+  // 纯数字（秒）
+  if (/^\d+(?:\.\d+)?$/.test(text)) return Number(text);
+  // HH:MM:SS 或 MM:SS
+  var hms = text.match(/(?:(\d+):)?(\d{1,2}):(\d{2})/);
+  if (hms) return (Number(hms[1] || 0) * 3600) + (Number(hms[2]) * 60) + Number(hms[3]);
+  // 中文 X小时X分X秒
+  var zh = text.match(/(\d+)\s*小时(?:\s*(\d+)\s*分)?(?:\s*(\d+)\s*秒)?/);
+  if (zh) return (Number(zh[1]) * 3600) + (Number(zh[2] || 0) * 60) + Number(zh[3] || 0);
+  return 0;
+}
+
+// 秒数 → 友好格式 1:23:45 或 23:45
+function formatDuration(seconds) {
+  var n = Number(seconds) || 0;
+  if (n <= 0) return '';
+  var total = Math.floor(n);
+  var h = Math.floor(total / 3600);
+  var m = Math.floor((total % 3600) / 60);
+  var s = total % 60;
+  if (h > 0) return h + ':' + (m < 10 ? '0' : '') + m + ':' + (s < 10 ? '0' : '') + s;
+  return m + ':' + (s < 10 ? '0' : '') + s;
+}
+
+// 从文件名推断扩展名
+function getExt(name) {
+  if (!name) return '';
+  var s = String(name).toLowerCase();
+  if (s.endsWith('.srt')) return '.srt';
+  if (s.endsWith('.ass')) return '.ass';
+  if (s.endsWith('.ssa')) return '.ssa';
+  return '';
 }
 
 // 检测哈希值文件名（不直接展示给用户）
@@ -110,7 +158,6 @@ function buildSearchKeys(params) {
     var raw = ctx.titleText.toUpperCase().replace(/[^A-Z0-9\s-]/g, ' ').replace(/\s+/g, ' ').trim();
     if (raw.length >= 3) keys.push(raw);
   }
-  // 去重
   var unique = [];
   var seen = {};
   for (var i = 0; i < keys.length; i++) {
@@ -152,6 +199,21 @@ async function searchApi(key) {
 
 function normalizeItem(raw) {
   var rawName = getText(raw.name || raw.Name || '');
+
+  // 智能解析时长（支持秒/毫秒/HMS/中文）
+  var duration = firstNumber(
+    parseDuration(raw.duration),
+    parseDuration(raw.Duration),
+    parseDuration(raw.TimeLength),
+    parseDuration(raw.time_length),
+    parseDuration(raw.Length),
+    parseDuration(raw.length),
+  );
+  // API 返回毫秒时转秒
+  if (duration > 86400) duration = Math.round(duration / 1000);
+
+  var langs = (raw.languages && raw.languages.join ? raw.languages.join(',') : '') || raw.langs || '';
+
   var displayName =
     rawName && !isHashName(rawName)
       ? rawName
@@ -162,16 +224,18 @@ function normalizeItem(raw) {
           : raw.mt === 2
             ? '网友上传字幕'
             : '光鸭字幕';
+
   return {
     id: raw.url || raw.gcid || raw.cid || Math.random().toString(36).slice(2),
     name: displayName,
     _rawName: rawName,
-    langs: (raw.languages && raw.languages.join ? raw.languages.join(',') : '') || raw.langs || '',
+    langs: langs,
+    ext: getExt(rawName) || '.srt',
     url: getText(raw.url),
     score: Number(raw.score || 0),
     fingerprintScore: Number(raw.fingerprintf_score || 0),
     mt: Number(raw.mt || 0),
-    duration: Math.round((raw.duration || 0) / 1000),
+    duration: duration,
     star: raw.star || '',
   };
 }
@@ -211,7 +275,6 @@ async function loadSubtitle(params) {
 
   var allSubs = [];
 
-  // 顺序搜索，找到结果即停
   for (var ki = 0; ki < searchKeys.length; ki++) {
     var list = await searchApi(searchKeys[ki]);
     if (list && list.length > 0) {
@@ -264,25 +327,23 @@ async function loadSubtitle(params) {
 
     var mtMap = { 0: '文件名匹配', 1: '指纹匹配', 2: '网友上传' };
     var mtLabel = mtMap[entry.item.mt] || '系统匹配';
+    var durationText = formatDuration(entry.item.duration);
+
+    // title 直接带上时长标签，借鉴经典剧集插件的做法
+    var cleanName = entry.item.name.replace(/\.(srt|ass|ssa)$/i, '');
+    var ext = getExt(entry.item.name) || entry.item.ext || '.srt';
 
     result.push({
       id: entry.item.id,
-      title: entry.item.name,
+      title: langTag(entry.item.langs) + cleanName + ext + (durationText ? ' ' + durationText : ''),
       subTitle: [
-        langTag(entry.item.langs),
-        entry.item.duration > 0
-          ? Math.floor(entry.item.duration / 60) + ':' + (entry.item.duration % 60 < 10 ? '0' : '') + (entry.item.duration % 60)
-          : '',
+        durationText,
         mtLabel + (entry.item.mt === 1 ? ' ✓' : ''),
-      ].filter(Boolean).join(' '),
+      ].filter(Boolean).join(' | '),
       description: [
-        entry.item.duration > 0
-          ? '时长 ' + Math.floor(entry.item.duration / 60) + ':' + (entry.item.duration % 60 < 10 ? '0' : '') + (entry.item.duration % 60)
-          : '',
         '匹配度: ' + entry.score,
-      ]
-        .filter(Boolean)
-        .join(' | '),
+        entry.item.langs ? '语言: ' + entry.item.langs : '',
+      ].filter(Boolean).join('\n'),
       lang: entry.item.langs || 'zh',
       duration: entry.item.duration || undefined,
       count: entry.score,
