@@ -322,13 +322,11 @@ async function loadDetail(link) {
     }
   }
 
-  // 获取播放 URL
+  // 获取播放 URL（使用无需 WBI 签名的老版 API）
   var videoUrl = "";
-  if (cid) {
+  if (cid && v.aid) {
     try {
-      var playParams = { bvid: bvid, cid: cid, qn: 80, fnval: 0, fnver: 0, fourk: 1, platform: "html5", web_location: 1315873 };
-      await wbiSign(playParams, sd);
-      var playUrl = buildUrl(API + "/x/player/wbi/playurl", playParams);
+      var playUrl = API + "/x/player/playurl?avid=" + v.aid + "&cid=" + cid + "&qn=80&platform=html5&otype=json";
       var playRes = await Widget.http.get(playUrl, { headers: buildHeaders(sd) });
       var playData = playRes && playRes.data;
       if (playData && playData.code === 0 && playData.data) {
