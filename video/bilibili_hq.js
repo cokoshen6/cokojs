@@ -11,6 +11,15 @@ WidgetMetadata = {
   detailCacheDuration: 300,
   globalParams: [
     { name: "sessdata", title: "SESSDATA (推荐)", type: "input", value: "" },
+    { name: "prefer_quality", title: "优先画质", type: "enumeration", value: "112",
+      enumOptions: [
+        { title: "4K (需大会员)", value: "120" },
+        { title: "1080P60 (需大会员)", value: "116" },
+        { title: "1080P+ (需大会员)", value: "112" },
+        { title: "1080P", value: "80" },
+        { title: "720P", value: "64" },
+      ],
+    },
   ],
   modules: [
     {
@@ -281,9 +290,11 @@ async function loadDetail(link) {
 
   // 尝试从 Widget.storage 读取 sessdata
   var sd = "";
+  var preferQn = 112;
   try { var stored = Widget.storage.get("sessdata"); if (stored) sd = stored; } catch(e) {}
-  // 也从 params.sessdata（如果能获取到）
   try { if (arguments[1] && arguments[1].sessdata) sd = arguments[1].sessdata; } catch(e) {}
+  try { var qStr = Widget.storage.get("prefer_quality"); if (qStr) preferQn = parseInt(qStr,10) || 112; } catch(e) {}
+  try { if (arguments[1] && arguments[1].prefer_quality) preferQn = parseInt(arguments[1].prefer_quality,10) || 112; } catch(e) {}
 
   var infoRes = await Widget.http.get(API + "/x/web-interface/view?bvid=" + encodeURIComponent(bvid), { headers: buildHeaders(sd) });
   var infoData = infoRes && infoRes.data;
@@ -308,7 +319,7 @@ async function loadDetail(link) {
   var videoUrl = "";
   if (cid && aid) {
     try {
-      var hqP = { bvid: bvid, cid: cid, qn: 112, fnval: 0, fnver: 0, fourk: 1, platform: "html5", web_location: 1315873 };
+      var hqP = { bvid: bvid, cid: cid, qn: preferQn, fnval: 0, fnver: 0, fourk: 1, platform: "html5", web_location: 1315873 };
       wbiSign(hqP);
       var hqR = await Widget.http.get(buildUrl(API + "/x/player/wbi/playurl", hqP), { headers: buildHeaders(sd) });
       var hqD = hqR && hqR.data;
