@@ -22,7 +22,7 @@
 WidgetMetadata = {
   id: "forward.okxxx",
   title: "OK.XXX",
-  version: "1.2.0",
+  version: "1.2.1",
   requiredVersion: "0.0.1",
   description: "OK.XXX 免费色情视频 - 最新/热门/流行/频道/女优/标签/搜索",
   author: "Minis",

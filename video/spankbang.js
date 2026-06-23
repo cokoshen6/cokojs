@@ -3,7 +3,7 @@
 WidgetMetadata = {
   id: "forward.spankbang",
   title: "SpankBang",
-  version: "1.0.0",
+  version: "1.0.1",
   requiredVersion: "0.0.1",
   description: "SpankBang 免费色情视频 - 热门/标签/搜索/详情/播放",
   author: "Minis",

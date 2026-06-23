@@ -9,7 +9,7 @@
 WidgetMetadata = {
   id: 'guangyasub',
   title: '光鸭字幕',
-  version: '1.3.0',
+  version: '1.3.1',
   requiredVersion: '0.0.1',
   description: '光鸭云盘字幕库。自动从影片信息提取番号/关键词搜索匹配字幕，支持指纹匹配、文件名匹配，智能排序。',
   author: 'Minis',

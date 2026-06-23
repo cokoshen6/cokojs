@@ -3,7 +3,7 @@
 WidgetMetadata = {
   id: "forward.bbcrec",
   title: "BBCREC",
-  version: "1.0.0",
+  version: "1.0.1",
   requiredVersion: "0.0.1",
   description: "BBCREC - Free Interracial Porn Videos",
   author: "Minis",

@@ -12,7 +12,7 @@ WidgetMetadata = {
   description: 'AVSubtitles 在线字幕加载插件。自动从影片信息提取关键词搜索，也支持手动搜索番号/关键词。',
   author: 'Minis',
   site: 'https://www.avsubtitles.com',
-  version: '1.4.0',
+  version: '1.4.1',
   requiredVersion: '0.0.1',
   modules: [
     {

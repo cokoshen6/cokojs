@@ -12,7 +12,7 @@ WidgetMetadata = {
   description: 'SubtitleCat 在线字幕加载插件。自动从影片信息提取关键词搜索，也支持手动搜索。返回 .srt 直链供播放器在线显示。',
   author: 'Minis',
   site: 'https://www.subtitlecat.com',
-  version: '1.1.0',
+  version: '1.1.1',
   requiredVersion: '0.0.1',
   modules: [
     {
