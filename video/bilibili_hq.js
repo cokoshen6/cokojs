@@ -19,6 +19,41 @@ WidgetMetadata = {
   },
   modules: [
     {
+      id: "category",
+      title: "分区浏览",
+      functionName: "loadCategory",
+      type: "video",
+      cacheDuration: 600,
+      params: [
+        { name: "rid", title: "分区", type: "enumeration", value: "1",
+          enumOptions: [
+            { title: "全站", value: "0" },
+            { title: "动画", value: "1" },
+            { title: "音乐", value: "3" },
+            { title: "游戏", value: "4" },
+            { title: "娱乐", value: "5" },
+            { title: "影视", value: "181" },
+            { title: "纪录片", value: "177" },
+            { title: "知识", value: "36" },
+            { title: "科技", value: "188" },
+            { title: "运动", value: "234" },
+            { title: "汽车", value: "223" },
+            { title: "生活", value: "160" },
+            { title: "美食", value: "211" },
+            { title: "动物圈", value: "217" },
+            { title: "鬼畜", value: "119" },
+            { title: "舞蹈", value: "129" },
+            { title: "时尚", value: "155" },
+            { title: "搞笑", value: "138" },
+            { title: "资讯", value: "202" },
+            { title: "电影", value: "23" },
+            { title: "电视剧", value: "11" },
+            { title: "番剧", value: "13" },
+          ],
+        },
+      ],
+    },
+    {
       id: "recommend",
       title: "首页推荐",
       functionName: "loadRecommend",
@@ -187,6 +222,20 @@ async function loadRecommend(p) {
   if (!d || d.code !== 0) throw new Error("推荐获取失败");
   var list = d.data && d.data.item || [];
   if (!list.length) throw new Error("暂无推荐");
+  return list.map(parseVideoItem);
+}
+
+// ========== 分区浏览 ==========
+
+async function loadCategory(p) {
+  var sd = p.sessdata || "";
+  var rid = String(p.rid || "0");
+  var url = API + "/x/web-interface/ranking/v2?rid=" + rid + "&type=all";
+  var res = await Widget.http.get(url, { headers: buildHeaders(sd) });
+  var d = res && res.data;
+  if (!d || d.code !== 0) throw new Error("分区获取失败");
+  var list = d.data && d.data.list || [];
+  if (!list.length) throw new Error("该分区暂无内容");
   return list.map(parseVideoItem);
 }
 
