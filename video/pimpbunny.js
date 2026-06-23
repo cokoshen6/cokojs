@@ -87,7 +87,7 @@ function parseVideos(html) {
   var items = [], seen = {};
   // \u6bcf\u5f20\u5361\u7247\u4e3a <a class="ui-card-link__..." href="/videos/.../"> ... </a>
   // \u5305\u542b <img src="..." alt="..."> \u548c\u65f6\u957f
-  var re = /<a[^>]*class="[^"]*ui-card-link__[^"]*"[^>]*href="(\/videos\/[^"]+)"[^>]*>([\s\S]*?)<\/a>/gi;
+  var re = /<a[^>]*class="[^"]*ui-card-link__[^"]*"[^>]*href="(https?:\/\/[^"]+\/videos\/[^"]+)"[^>]*>([\s\S]*?)<\/a>/gi;
   var m;
   while ((m = re.exec(html))) {
     var link = normUrl(m[1]), id = link.split("/").filter(Boolean).pop() || link;
@@ -96,13 +96,14 @@ function parseVideos(html) {
     var inner = m[2];
     // data-webp 含真实封面 URL，data:image base64 是缩略图占位
     var webp = inner.match(/data-webp="([^"]+)"/);
-    var img = webp ? webp : inner.match(/<img[^>]+src="([^"]+?)"/);
+    var imgMatch = webp && webp[1] && webp[1].startsWith('http') ? webp : inner.match(/<img[^>]+src="([^"]+?)"/);
+    var srcVal = imgMatch ? imgMatch[1] : '';
     var alt = inner.match(/alt="([^"]+)"/);
     var dur = inner.match(/(\d{1,2}:\d{2}(?::\d{2})?)\s*[^<]*</);
     var views = inner.match(/([\d.]+[KM]?)\s*(?:views?|hour|minute|ago)/i);
     items.push({
       id: id, type: "link", title: clean(alt ? alt[1] : id),
-      coverUrl: img ? img[1].replace(/&amp;/g, "&").replace(/^data:image.*/, "") : "",
+      coverUrl: srcVal.replace(/&amp;/g, "&").replace(/^data:image.*/, ""),
       link: link,
       rating: views ? function(s){if(!s)return 0;var m=s.match(/^([\d.]+)\s*([KM]?)$/i);if(!m)return 0;var n=parseFloat(m[1]),u=m[2].toUpperCase();return u==="K"?Math.round(n*1000):u==="M"?Math.round(n*1000000):Math.round(n);}(views[1]):undefined,
       durationText: dur ? clean(dur[1]) : undefined,
