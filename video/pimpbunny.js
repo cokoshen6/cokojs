@@ -184,10 +184,27 @@ async function loadDetail(link) {
   while ((tm = tagRe.exec(html))) { var n = clean(tm[2]); if (n && n.length < 50) tags.push({ id: tm[1].toLowerCase(), title: n }); }
 
   var videoUrl = "";
-  var srcRe = /get_file[^"']*(?:720p|1080p|480p|360p|240p)[^"']*\.mp4/g;
-  var srcs = html.match(srcRe);
-  if (srcs && srcs.length > 0) { videoUrl = SITE + "/" + srcs[srcs.length - 1].replace(/^\//, ""); }
-  if (!videoUrl) { srcs = html.match(/get_file[^"']*\.mp4/g); if (srcs && srcs.length > 0) { videoUrl = SITE + "/" + srcs[srcs.length - 1].replace(/^\//, ""); } }
+  // 提取视频源：优先 1080p → 720p → 480p → 360p → 基础版，排除预览版
+  var qualities = ["1080p", "720p", "480p", "360p"];
+  for (var qi = 0; qi < qualities.length; qi++) {
+    var re = new RegExp("get_file[^\"']*" + qualities[qi] + "[^\"']*\\.mp4", "g");
+    var all = html.match(re);
+    if (all && all.length > 0) {
+      var urls = [];
+      for (var ui = 0; ui < all.length; ui++) {
+        if (all[ui].indexOf("preview") === -1 && all[ui].indexOf("_pb_") >= 0) urls.push(all[ui]);
+      }
+      if (urls.length > 0) { videoUrl = SITE + "/" + urls[0].replace(/^\//, ""); break; }
+    }
+  }
+  if (!videoUrl) {
+    var fallback = html.match(/get_file\/[^"']*?\/(\d+)\/(\d+)\/\d+\.mp4/g);
+    if (fallback && fallback.length > 0) {
+      for (var fi = 0; fi < fallback.length; fi++) {
+        if (fallback[fi].indexOf("preview") === -1) { videoUrl = SITE + "/" + fallback[fi].replace(/^\//, ""); break; }
+      }
+    }
+  }
 
   var relatedItems = parseCards(html).slice(0, 20);
 
