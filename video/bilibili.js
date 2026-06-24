@@ -87,7 +87,7 @@ async function loadDetail(link){
   if(pi<0||pi>=pg.length) pi=0;
   var cid=pg[pi]&&pg[pi].cid;
 
-  var eps=[];for(var ei=0;ei<pg.length;ei++) eps.push({id:"ep:"+pg[ei].cid,title:(ei+1)+": "+(pg[ei].part||"P"+(ei+1)),link:"bilibili:"+bvid+":"+ei});
+  var eps=[];for(var ei=0;ei<pg.length;ei++) eps.push({id:"ep:"+pg[ei].cid,title:(ei+1)+": "+(pg[ei].part||"P"+(ei+1)),type:"url",link:"bilibili:"+bvid+":"+ei});
 
   var vu="";
   if(cid&&aid){try{var fr=await Widget.http.get(API+"/x/player/playurl?avid="+aid+"&cid="+cid+"&qn=80&platform=ios&otype=json&fourk=1",{headers:hd()});var fd=fr&&fr.data;if(fd&&fd.code===0&&fd.data&&fd.data.durl) vu=fd.data.durl[0].url;}catch(e){}}
